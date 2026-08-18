@@ -1,0 +1,25 @@
+# Run once per deploy (before/instead of relying on the web pods' own
+# migrate-on-boot). Keeps schema migrations out of a 3-replica rolling
+# rollout racing each other.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: url-shortener-migrate
+  namespace: url-shortener
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: your-registry/url-shortener:latest
+          # Deliberately no `command:` override here — the image's
+          # ENTRYPOINT (docker/entrypoint.sh) waits for Postgres before
+          # exec'ing these args.
+          args: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: url-shortener-config
+            - secretRef:
+                name: url-shortener-secrets

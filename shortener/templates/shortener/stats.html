@@ -1,0 +1,86 @@
+{% extends "shortener/base.html" %}
+
+{% block title %}Stats for {{ short.code }} &mdash; Snip{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-6 py-14">
+  <div class="mb-8">
+    <a href="{% url 'dashboard' %}" class="text-sm text-slate-500 hover:text-slate-300">&larr; Back to dashboard</a>
+    <h1 class="text-2xl font-bold tracking-tight mt-2 font-mono">{{ short.code }}</h1>
+    <a href="{{ short.short_url }}" target="_blank" rel="noopener" class="text-brand-300 hover:underline text-sm">{{ short.short_url }}</a>
+    <p class="text-slate-500 text-sm mt-1 truncate">&rarr; {{ short.long_url }}</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Total clicks</p>
+      <p class="text-3xl font-bold mt-1">{{ total_clicks }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Created</p>
+      <p class="text-3xl font-bold mt-1">{{ short.created_at|date:"M j" }}</p>
+    </div>
+    <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Days active</p>
+      <p class="text-3xl font-bold mt-1">{{ daily|length }}</p>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 mb-8">
+    <h2 class="text-sm font-semibold text-slate-300 mb-4">Clicks per day</h2>
+    {% if daily %}
+      <canvas id="dailyChart" height="90"></canvas>
+    {% else %}
+      <p class="text-slate-500 text-sm">No click data yet. Share the link to see activity here.</p>
+    {% endif %}
+  </div>
+
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+    <h2 class="text-sm font-semibold text-slate-300 px-6 pt-5 pb-3">Top referrers</h2>
+    {% if top_referrers %}
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-slate-800/70">
+        {% for referrer, count in top_referrers %}
+        <tr>
+          <td class="px-6 py-3 text-slate-300 truncate max-w-xs">{{ referrer }}</td>
+          <td class="px-6 py-3 text-right font-semibold">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="px-6 pb-5 text-slate-500 text-sm">No referrer data yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if daily %}
+<script>
+  const ctx = document.getElementById('dailyChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [{% for day, count in daily %}"{{ day }}",{% endfor %}],
+      datasets: [{
+        label: 'Clicks',
+        data: [{% for day, count in daily %}{{ count }},{% endfor %}],
+        backgroundColor: '#6366f1',
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+        y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#1e293b' } },
+      },
+    },
+  });
+</script>
+{% endif %}
+{% endblock %}

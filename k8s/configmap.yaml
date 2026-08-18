@@ -1,0 +1,23 @@
+# Non-secret app config. Hostnames match the Bitnami Helm chart release
+# names used in the README install commands (postgres, redis, kafka).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: url-shortener-config
+  namespace: url-shortener
+data:
+  DJANGO_DEBUG: "false"
+  DJANGO_ALLOWED_HOSTS: "*"
+  SITE_BASE_URL: "http://localhost:8000"
+  POSTGRES_DB: "urlshortener"
+  POSTGRES_USER: "urlshortener"
+  POSTGRES_HOST: "postgres-postgresql"
+  POSTGRES_PORT: "5432"
+  REDIS_HOST: "redis-master"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  KAFKA_CLICK_TOPIC: "click_events"
+  SHORTEN_RATE_LIMIT: "10"
+  SHORTEN_RATE_WINDOW_SECONDS: "60"
+  REDIRECT_CACHE_TTL_SECONDS: "3600"

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: url-shortener-consumer
+  namespace: url-shortener
+  labels:
+    app: url-shortener-consumer
+spec:
+  # Matches click_events' partition count (3) so each pod in the
+  # `analytics-consumer` consumer group can own exactly one partition.
+  replicas: 3
+  selector:
+    matchLabels:
+      app: url-shortener-consumer
+  template:
+    metadata:
+      labels:
+        app: url-shortener-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: your-registry/url-shortener:latest
+          args: ["python", "manage.py", "consume_clicks"]
+          envFrom:
+            - configMapRef:
+                name: url-shortener-config
+            - secretRef:
+                name: url-shortener-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

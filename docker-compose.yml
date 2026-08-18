@@ -1,0 +1,179 @@
+x-kafka-common: &kafka-common
+  # bitnami/kafka moved actively-maintained tags behind Bitnami Secure
+  # Images in 2025; bitnamilegacy/* keeps the last free snapshot per tag.
+  image: bitnamilegacy/kafka:3.7
+  restart: unless-stopped
+  environment: &kafka-common-env
+    # All 3 nodes must format their storage with the same cluster ID or
+    # each one bootstraps its own independent single-node cluster and the
+    # controller quorum never forms. Bitnami's entrypoint otherwise
+    # generates a random one per container on first boot.
+    KAFKA_KRAFT_CLUSTER_ID: "M_Hc8iihTv6nQSgn5-CKew"
+    KAFKA_CFG_PROCESS_ROLES: controller,broker
+    KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+    # Auto-create is off on purpose: click_events is created explicitly by
+    # kafka-init with replication-factor=3, so we control that setting
+    # instead of relying on broker defaults.
+    KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+    KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: "3"
+    KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+    KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+    KAFKA_CFG_MIN_INSYNC_REPLICAS: "2"
+    ALLOW_PLAINTEXT_LISTENER: "yes"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-urlshortener}
+      POSTGRES_USER: ${POSTGRES_USER:-urlshortener}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-urlshortener}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-urlshortener}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "6379:6379"
+
+  # --- 3-node Kafka cluster, KRaft mode, each node is both a controller
+  # and a broker ("combined mode" — the standard small-cluster topology,
+  # no separate Zookeeper/controller-only nodes needed). click_events is
+  # created with replication-factor=3 by kafka-init below, so any single
+  # broker can go down without losing partition leadership or data.
+  kafka-1:
+    <<: *kafka-common
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092
+    volumes:
+      - kafka_1_data:/bitnami/kafka
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  kafka-2:
+    <<: *kafka-common
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: "2"
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092
+    volumes:
+      - kafka_2_data:/bitnami/kafka
+    ports:
+      - "9094:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  kafka-3:
+    <<: *kafka-common
+    environment:
+      <<: *kafka-common-env
+      KAFKA_CFG_NODE_ID: "3"
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9092
+    volumes:
+      - kafka_3_data:/bitnami/kafka
+    ports:
+      - "9096:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  # One-shot: creates click_events with partitions=3 / replication-factor=3
+  # once all three brokers are up, then exits. Re-running is a no-op
+  # (--if-not-exists).
+  kafka-init:
+    image: bitnamilegacy/kafka:3.7
+    restart: "no"
+    depends_on:
+      kafka-1:
+        condition: service_healthy
+      kafka-2:
+        condition: service_healthy
+      kafka-3:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        kafka-topics.sh --bootstrap-server kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+          --create --if-not-exists \
+          --topic click_events \
+          --partitions 3 \
+          --replication-factor 3 \
+          --config min.insync.replicas=2
+        kafka-topics.sh --bootstrap-server kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+          --describe --topic click_events
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  # Scale with: docker compose up -d --scale consumer=3
+  # Partition count (3) matches the intended replica count so each
+  # consumer in the `analytics-consumer` group can own one partition.
+  consumer:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+    command: ["python", "manage.py", "consume_clicks"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  kafka_1_data:
+  kafka_2_data:
+  kafka_3_data:

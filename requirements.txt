@@ -1,0 +1,13 @@
+# Core
+Django==5.0.7
+psycopg2-binary==2.9.9
+redis==5.0.7
+gunicorn==22.0.0
+
+# Async analytics pipeline
+# kafka-python-ng: maintained fork of kafka-python with Python 3.12 support
+# (upstream kafka-python 2.0.2 fails to import under 3.12). Same `kafka` API.
+kafka-python-ng==2.2.2
+
+# Config
+python-dotenv==1.0.1

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Snip &mdash; URL Shortener{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#312e81',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <div class="min-h-screen flex flex-col">
+    <nav class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
+      <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="{% url 'home' %}" class="flex items-center gap-2 font-semibold text-lg tracking-tight">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white text-sm font-bold">S</span>
+          <span>Snip</span>
+        </a>
+        <div class="flex items-center gap-6 text-sm text-slate-300">
+          <a href="{% url 'home' %}" class="hover:text-white transition-colors">Shorten</a>
+          <a href="{% url 'dashboard' %}" class="hover:text-white transition-colors">Dashboard</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="flex-1">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-t border-slate-800/80 py-6">
+      <div class="max-w-5xl mx-auto px-6 text-xs text-slate-500 flex items-center justify-between">
+        <span>Snip &mdash; scalable URL shortener with async analytics</span>
+        <span>Django &middot; Postgres &middot; Redis &middot; Kafka</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

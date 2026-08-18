@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: url-shortener-web
+  namespace: url-shortener
+  labels:
+    app: url-shortener-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: url-shortener-web
+  template:
+    metadata:
+      labels:
+        app: url-shortener-web
+    spec:
+      containers:
+        - name: web
+          image: your-registry/url-shortener:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: url-shortener-config
+            - secretRef:
+                name: url-shortener-secrets
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

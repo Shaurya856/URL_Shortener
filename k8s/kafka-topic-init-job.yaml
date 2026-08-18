@@ -1,0 +1,29 @@
+# One-shot Job mirroring docker-compose's kafka-init service: creates
+# click_events with partitions=3 / replication-factor=3 against the
+# 3-broker Kafka cluster installed via the Bitnami Helm chart (see
+# README for the `helm install kafka ...` command). Re-running is a
+# no-op (--if-not-exists).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topic-init
+  namespace: url-shortener
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-topic-init
+          image: bitnamilegacy/kafka:3.7
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              kafka-topics.sh --bootstrap-server kafka:9092 \
+                --create --if-not-exists \
+                --topic click_events \
+                --partitions 3 \
+                --replication-factor 3 \
+                --config min.insync.replicas=2
+              kafka-topics.sh --bootstrap-server kafka:9092 \
+                --describe --topic click_events

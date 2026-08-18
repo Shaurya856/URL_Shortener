@@ -1,0 +1,55 @@
+{% extends "shortener/base.html" %}
+
+{% block title %}Dashboard &mdash; Snip{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-6 py-14">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Your links</h1>
+      <p class="text-slate-500 text-sm mt-1">Links created from this browser session.</p>
+    </div>
+    <a href="{% url 'home' %}" class="rounded-lg bg-brand-600 hover:bg-brand-500 transition-colors px-4 py-2 text-sm font-semibold text-white">
+      + New link
+    </a>
+  </div>
+
+  {% if link_data %}
+  <div class="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-xs uppercase tracking-wide text-slate-500 border-b border-slate-800">
+          <th class="px-5 py-3 font-medium">Code</th>
+          <th class="px-5 py-3 font-medium">Short URL</th>
+          <th class="px-5 py-3 font-medium hidden sm:table-cell">Destination</th>
+          <th class="px-5 py-3 font-medium text-right">Clicks</th>
+          <th class="px-5 py-3 font-medium hidden sm:table-cell">Created</th>
+          <th class="px-5 py-3 font-medium"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800/70">
+        {% for row in link_data %}
+        <tr class="hover:bg-slate-800/30 transition-colors">
+          <td class="px-5 py-3 font-mono text-brand-300">{{ row.link.code }}</td>
+          <td class="px-5 py-3">
+            <a href="{{ row.link.short_url }}" target="_blank" rel="noopener" class="text-slate-200 hover:underline">{{ row.link.short_url }}</a>
+          </td>
+          <td class="px-5 py-3 text-slate-500 truncate max-w-xs hidden sm:table-cell">{{ row.link.long_url }}</td>
+          <td class="px-5 py-3 text-right font-semibold">{{ row.total_clicks }}</td>
+          <td class="px-5 py-3 text-slate-500 hidden sm:table-cell">{{ row.link.created_at|date:"M j, Y" }}</td>
+          <td class="px-5 py-3 text-right">
+            <a href="{% url 'stats' row.link.code %}" class="text-brand-300 hover:underline">Stats &rarr;</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="rounded-2xl border border-dashed border-slate-800 p-16 text-center">
+    <p class="text-slate-400">No links yet.</p>
+    <a href="{% url 'home' %}" class="mt-3 inline-block text-brand-300 hover:underline">Create your first short link &rarr;</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
