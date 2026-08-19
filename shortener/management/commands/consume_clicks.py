@@ -25,6 +25,11 @@ class Command(BaseCommand):
     entrypoint: `python manage.py consume_clicks`). Batches inserts into
     Postgres and updates rolling Redis aggregates so the stats pages never
     have to touch Kafka or scan raw click rows at request time.
+
+    Offsets are committed manually, only after a batch's _flush() succeeds
+    (enable_auto_commit=False) — so a crash mid-batch replays those events
+    on restart instead of skipping them, at the cost of possible duplicate
+    processing (at-least-once, not exactly-once).
     """
 
     help = "Consume click_events from Kafka, batch-write to Postgres, update Redis aggregates"
@@ -48,12 +53,14 @@ class Command(BaseCommand):
                 )
                 if should_flush:
                     self._flush(buffer, redis_conn)
+                    consumer.commit()
                     buffer = []
                     last_flush = time.time()
 
             # consumer_timeout_ms fired with no messages: flush whatever we have.
             if buffer:
                 self._flush(buffer, redis_conn)
+                consumer.commit()
                 buffer = []
                 last_flush = time.time()
 
@@ -66,7 +73,7 @@ class Command(BaseCommand):
                     group_id="analytics-consumer",
                     value_deserializer=lambda v: json.loads(v.decode("utf-8")),
                     auto_offset_reset="earliest",
-                    enable_auto_commit=True,
+                    enable_auto_commit=False,
                     consumer_timeout_ms=BATCH_TIMEOUT_SECONDS * 1000,
                 )
             except KafkaError as exc:

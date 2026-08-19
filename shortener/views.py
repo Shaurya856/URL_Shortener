@@ -95,7 +95,11 @@ def redirect_short_url(request, code):
             raise Http404("Short link has expired")
 
         long_url = short.long_url
-        r.set(cache_key, long_url, ex=settings.REDIRECT_CACHE_TTL_SECONDS)
+        ttl = settings.REDIRECT_CACHE_TTL_SECONDS
+        if short.expires_at:
+            seconds_to_expiry = int((short.expires_at - timezone.now()).total_seconds())
+            ttl = max(1, min(ttl, seconds_to_expiry))
+        r.set(cache_key, long_url, ex=ttl)
 
     event = {
         "code": code,

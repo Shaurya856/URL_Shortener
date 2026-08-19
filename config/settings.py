@@ -89,3 +89,13 @@ SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "http://localhost:8000")
 SHORTEN_RATE_LIMIT = int(os.environ.get("SHORTEN_RATE_LIMIT", "10"))  # requests
 SHORTEN_RATE_WINDOW_SECONDS = int(os.environ.get("SHORTEN_RATE_WINDOW_SECONDS", "60"))
 REDIRECT_CACHE_TTL_SECONDS = int(os.environ.get("REDIRECT_CACHE_TTL_SECONDS", "3600"))
+
+# --- Security ---
+# Salt for one-way hashing of client IPs before storage (see shortener.utils.hash_ip).
+# Must be overridden in production - the default only exists so dev/tests don't crash.
+IP_HASH_SALT = os.environ.get("IP_HASH_SALT", "dev-insecure-ip-salt-change-me")
+
+# Only trust the X-Forwarded-For header when a reverse proxy in front of this
+# app is known to set/strip it. With no proxy (the default deployment here),
+# a client can set this header itself and spoof its IP to dodge rate limiting.
+TRUST_X_FORWARDED_FOR = os.environ.get("TRUST_X_FORWARDED_FOR", "false").lower() == "true"

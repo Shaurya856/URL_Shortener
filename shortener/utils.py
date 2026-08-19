@@ -2,6 +2,8 @@ import hashlib
 import random
 import time
 
+from django.conf import settings
+
 BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 BASE62_LEN = len(BASE62_ALPHABET)
 
@@ -22,14 +24,14 @@ def base62_encode(number: int) -> str:
 
 def hash_ip(ip: str) -> str:
     """One-way hash so we never persist raw client IPs."""
-    salt = "url-shortener-ip-salt"
-    return hashlib.sha256(f"{salt}:{ip}".encode()).hexdigest()[:32]
+    return hashlib.sha256(f"{settings.IP_HASH_SALT}:{ip}".encode()).hexdigest()[:32]
 
 
 def client_ip(request) -> str:
-    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    if settings.TRUST_X_FORWARDED_FOR:
+        forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR", "unknown")
 
 

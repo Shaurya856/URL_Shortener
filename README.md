@@ -120,6 +120,10 @@ Two different jobs, same tool:
   `GROUP BY` queries over a growing `Click` table on every load.
 - **Rate limiting**: a Redis sorted-set sliding window guards `/shorten`
   against abuse without adding a stateful dependency to the app tier itself.
+  Keyed off `client_ip()`, which only trusts `X-Forwarded-For` when
+  `TRUST_X_FORWARDED_FOR=true` — off by default since nothing in this stack
+  puts a proxy in front of `web` to set/strip that header, so trusting it
+  unconditionally would let a client spoof its way around the limit.
 
 ### Distributed ID generation: pre-allocated ranges
 
@@ -291,8 +295,8 @@ python manage.py consume_clicks
   `User` — no auth flow is wired up, but the field exists for one),
   `session_key` (session-based ownership for the dashboard), `created_at`,
   `expires_at` (nullable).
-- **Click**: `short_url` (FK), `timestamp`, `referrer`, `ip_hash` (SHA-256,
-  raw IPs are never stored), `user_agent`.
+- **Click**: `short_url` (FK), `timestamp`, `referrer`, `ip_hash` (SHA-256
+  salted with `IP_HASH_SALT`, raw IPs are never stored), `user_agent`.
 - **IdCounter**: single-row central counter backing pre-allocated ID range
   claims (see above) — not exposed anywhere in the app itself.
 
@@ -366,6 +370,10 @@ Honestly acknowledged, not implemented in this pass:
   losses; not done here to keep the demo footprint small.
 - No HPA (noted above), no TLS between services, no auth on the Kafka
   cluster or Redis (fine for a local/demo network, not for a shared one).
+- **`DEBUG` and `ALLOWED_HOSTS` default to dev-friendly values** (`true` /
+  `*`) so the app runs out of the box locally — `DJANGO_DEBUG=false` and a
+  real `DJANGO_ALLOWED_HOSTS` value must be set via env vars before this
+  is exposed anywhere outside a local/demo network.
 
 ## What's explicitly out of scope
 
