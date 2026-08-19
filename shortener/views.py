@@ -2,6 +2,7 @@ import json
 import uuid
 
 from django.conf import settings
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -115,18 +116,25 @@ def redirect_short_url(request, code):
     return HttpResponseRedirect(long_url)
 
 
+DASHBOARD_PAGE_SIZE = 20
+
+
 def dashboard(request):
     session_key = _ensure_session(request)
     links = ShortURL.objects.filter(session_key=session_key)
 
+    paginator = Paginator(links, DASHBOARD_PAGE_SIZE)
+    page = paginator.get_page(request.GET.get("page"))
+
     r = get_redis()
+    totals = r.mget([f"{STATS_TOTAL_KEY}{link.code}" for link in page])
+
     link_data = []
-    for link in links:
-        total = r.get(f"{STATS_TOTAL_KEY}{link.code}")
+    for link, total in zip(page, totals):
         total_clicks = int(total) if total is not None else link.clicks.count()
         link_data.append({"link": link, "total_clicks": total_clicks})
 
-    return render(request, "shortener/dashboard.html", {"link_data": link_data})
+    return render(request, "shortener/dashboard.html", {"link_data": link_data, "page": page})
 
 
 def _stats_payload(code):
