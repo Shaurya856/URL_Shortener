@@ -72,6 +72,15 @@ and update rolling Redis counters (`stats:total:<code>`, `stats:daily:<code>`,
 `stats:referrers:<code>`) so stats pages are O(1) Redis reads instead of
 scanning the `Click` table on every view.
 
+Offsets are committed manually after a batch's Postgres/Redis writes succeed,
+not before — this is **at-least-once** delivery: a crash mid-batch replays
+those events on restart rather than skipping them. Replays are made safe by
+`event_id`, a UUID assigned when the event is published (not when it's
+consumed): the Postgres insert uses `ignore_conflicts=True` against a unique
+constraint on `Click.event_id`, and the Redis counter increments are gated
+behind a `SET NX` dedup key per `event_id` — so a replayed event lands
+exactly once in both stores no matter how many times it's redelivered.
+
 ### Why Kafka here, and why 3 brokers / RF=3
 
 Click volume can spike (a link goes viral) independently of write capacity
@@ -295,8 +304,9 @@ python manage.py consume_clicks
   `User` — no auth flow is wired up, but the field exists for one),
   `session_key` (session-based ownership for the dashboard), `created_at`,
   `expires_at` (nullable).
-- **Click**: `short_url` (FK), `timestamp`, `referrer`, `ip_hash` (SHA-256
-  salted with `IP_HASH_SALT`, raw IPs are never stored), `user_agent`.
+- **Click**: `short_url` (FK), `event_id` (UUID, unique — dedup key for
+  at-least-once Kafka redelivery), `timestamp`, `referrer`, `ip_hash`
+  (SHA-256 salted with `IP_HASH_SALT`, raw IPs are never stored), `user_agent`.
 - **IdCounter**: single-row central counter backing pre-allocated ID range
   claims (see above) — not exposed anywhere in the app itself.
 
