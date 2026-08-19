@@ -44,6 +44,10 @@ class ShortURL(models.Model):
 
 class Click(models.Model):
     short_url = models.ForeignKey(ShortURL, on_delete=models.CASCADE, related_name="clicks")
+    # Set by the publisher (shortener.views), not the consumer, so replaying the
+    # same Kafka event after an at-least-once redelivery hits this unique
+    # constraint instead of creating a duplicate row.
+    event_id = models.CharField(max_length=36, unique=True, null=True)
     timestamp = models.DateTimeField(db_index=True)
     referrer = models.CharField(max_length=512, blank=True, default="")
     ip_hash = models.CharField(max_length=64, blank=True, default="")

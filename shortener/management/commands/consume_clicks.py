@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 100
 BATCH_TIMEOUT_SECONDS = 5
+# How long an event_id is remembered for Redis-side dedup. Only needs to
+# outlive the window in which a crash-and-restart could replay a batch that
+# was flushed but not yet committed - an hour is generous for that.
+DEDUP_TTL_SECONDS = 3600
 
 
 class Command(BaseCommand):
@@ -95,6 +99,7 @@ class Command(BaseCommand):
             clicks.append(
                 Click(
                     short_url_id=short_id,
+                    event_id=e.get("event_id"),
                     timestamp=parse_datetime(e["timestamp"]),
                     referrer=e.get("referrer", "")[:512],
                     ip_hash=e.get("ip_hash", ""),
@@ -103,11 +108,24 @@ class Command(BaseCommand):
             )
 
         if clicks:
-            Click.objects.bulk_create(clicks)
+            # ignore_conflicts: a redelivered event (at-least-once commit,
+            # see class docstring) hits the event_id unique constraint and is
+            # skipped instead of erroring the whole batch.
+            Click.objects.bulk_create(clicks, ignore_conflicts=True)
+
+        # Redis counters aren't naturally idempotent (a second INCR for the
+        # same event double-counts), so gate them on a per-event_id dedup key
+        # first: only events that "win" the SET NX get their counters applied.
+        relevant = [e for e in events if e["code"] in code_to_id]
+
+        dedup_pipe = redis_conn.pipeline()
+        for e in relevant:
+            dedup_pipe.set(f"dedup:click:{e.get('event_id')}", 1, nx=True, ex=DEDUP_TTL_SECONDS)
+        dedup_results = dedup_pipe.execute() if relevant else []
 
         pipe = redis_conn.pipeline()
-        for e in events:
-            if e["code"] not in code_to_id:
+        for e, is_new in zip(relevant, dedup_results):
+            if not is_new:
                 continue
             code = e["code"]
             day = e["timestamp"][:10]

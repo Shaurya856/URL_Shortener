@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from django.conf import settings
 from django.http import Http404, HttpResponseRedirect, JsonResponse
@@ -102,6 +103,7 @@ def redirect_short_url(request, code):
         r.set(cache_key, long_url, ex=ttl)
 
     event = {
+        "event_id": str(uuid.uuid4()),
         "code": code,
         "timestamp": timezone.now().isoformat(),
         "referrer": request.META.get("HTTP_REFERER", "")[:512],
