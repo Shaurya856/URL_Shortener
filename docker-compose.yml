@@ -1,7 +1,9 @@
 x-kafka-common: &kafka-common
   # bitnami/kafka moved actively-maintained tags behind Bitnami Secure
-  # Images in 2025; bitnamilegacy/* keeps the last free snapshot per tag.
-  image: bitnamilegacy/kafka:3.7
+  # Images in 2025; apecloud/kafka is a Bitnami-compatible fork that still
+  # publishes free multi-arch (amd64+arm64) builds, unlike bitnamilegacy/*
+  # which is amd64-only.
+  image: apecloud/kafka:3.7.1-debian-12-r11
   restart: unless-stopped
   environment: &kafka-common-env
     # All 3 nodes must format their storage with the same cluster ID or
@@ -113,7 +115,7 @@ services:
   # once all three brokers are up, then exits. Re-running is a no-op
   # (--if-not-exists).
   kafka-init:
-    image: bitnamilegacy/kafka:3.7
+    image: apecloud/kafka:3.7.1-debian-12-r11
     restart: "no"
     depends_on:
       kafka-1:
